@@ -1,0 +1,28 @@
+Check,Description,Result,Detail
+V01,"Primary keys unique (Case_ID, Case_Harm_ID, Deployment_ID, Benefit_ID)",PASS,
+V02a,Every CASE_HARMS.Case_ID exists in INCIDENT_CASES,PASS,
+V02b,CASE_HARM_ATTRIBUTES is 1:1 with CASE_HARMS,PASS,
+V02c,Non-null Deployment_ID values exist in AI_DEPLOYMENT,PASS,55 rows with NULL Deployment_ID (deployment not identifiable)
+V02d,CASE_BENEFITS keys exist (Case_ID or Deployment_ID),PASS,
+V03,People_Affected_Count consistent within incident; Represented_Person_Count sums to it (when known),PASS,
+V04,"Recomputed severity (x=(L-1)/4, power mean q=2, equal weights) equals stored severity",PASS,1268 scored rows checked; scored only when all five levels are present
+V05,"Levels are integers 1-5 and normalised values equal (L-1)/4 (all in [0,1])",PASS,
+V06,Scope = domain count capped at 5 (NOT population); Duration level matches rubric bands,PASS,
+V07,p_a + p_h + p_c = 100 for every deployment row,PASS,
+V08,Actual_Replacement_Percentage <= AI_Only_Work_Percentage,PASS,
+V09a,No CONFIRMED predicate duplicates a NEGATED/HYPOTHETICAL predicate within a harm,PASS,
+V09b,Every NEGATED/HYPOTHETICAL predicate is backed by a matching sentence in the description (synthetic rows),FAIL,
+V09c,Each harm status is supported by a predicate with a matching status (negated/hypothetical text never creates a confirmed harm),FAIL,
+V10,NULL vs 0: unknown exposure is NULL (never 0); no-deployment shares are explicit scenario zeros; active exposure > 0,PASS,
+V11,"SYNTHETIC vs DOCUMENTED separation (1000 synthetic cases, 15 documented; sources/quality/Deployment_ID rules)",PASS,"1000 synthetic, 15 documented case rows"
+V12,Incident_Date within the linked deployment's exposure period and <= Report_Date,PASS,
+V13,Overlap groups have >= 2 harm rows (same case for synthetic),PASS,
+V14,"Confirmation_Weight mapping (CONFIRMED 1.0, ALLEGED 0.25, SUSPECTED 0.20, UNKNOWN 0.10, CONTRADICTED 0.0)",PASS,
+V15,Extraction_Confidence is NULL (no extraction model run),PASS,
+V16,Currency is USD wherever a financial amount exists; none otherwise,PASS,
+V17,"Employment and sovereignty severity kept separate (one populated per row, matching taxonomy)",PASS,
+V18,Remedy/Reversibility consistency (R=5 => no remedy; no remedy => R>=3),PASS,
+V19,"Coverage: all 19 harm categories, all 5 statuses, >=2 no-deployment fields, active deployments with zero incidents",PASS,"37 active/pilot deployments with zero incidents; no-deployment fields: ['Agriculture', 'Education', 'Urban Infrastructure']"
+V20,Distribution quality: severity varies within every category; no near-perfect correlation between dimensions; no duplicate rows,FAIL,max |corr| between level dimensions = 0.66
+V21,Documented rows are scored only when all five levels are supported; others INSUFFICIENT_EVIDENCE,PASS,
+V22,Information_Imputed FALSE everywhere (no imputation performed),PASS,

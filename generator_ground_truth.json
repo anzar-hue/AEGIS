@@ -1,0 +1,14 @@
+{
+ "seed": 20261123,
+ "note": "Ground-truth generating effects (validation only, never findings)",
+ "incident_weight": "w = (exposure/unit_median)^0.7 * exp(0.012*(p_a-40)+0.010*p_r -0.18*oversight_rank -0.35*[audit==YES] -0.20*privacy_rank -0.15*[monitoring==YES]) * Gamma(shape 0.6)",
+ "mechanism_weight": "data: exp(-0.35*privacy_rank-0.25*security_rank); decision: exp(-0.25*oversight_rank-0.30*appeal_rank); employment: exp(0.012*(p_a-40)+0.010*p_r)",
+ "level_model": "level = clip(round(mu + 0.7*z_incident + N(0,0.55)),1,5); Reversibility mu lowered by 0.5*appeal_rank",
+ "confirmation_mix": {
+  "CONFIRMED": 0.8,
+  "ALLEGED": 0.08,
+  "SUSPECTED": 0.06,
+  "UNKNOWN": 0.04,
+  "CONTRADICTED": 0.02
+ }
+}
