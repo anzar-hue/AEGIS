@@ -1,32 +1,13 @@
 import json
-import os
 import time
 from typing import Dict, Any
-from dotenv import load_dotenv
-load_dotenv()
 
-try:
-    from google import genai
-    from google.genai import types
-    GENAI_AVAILABLE = True
-except ImportError:
-    types = None
-    GENAI_AVAILABLE = False
-
+from llm_fallback import generate_with_fallback
 from math_engine import (
     compute_individual_severity,
     agent_3_rule_based_evaluator,
     CONFIRMATION_WEIGHTS,
 )
-
-GEMINI_MODEL = "gemini-3.8-flash"
-
-
-def _get_client():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if GENAI_AVAILABLE and api_key:
-        return genai.Client(api_key=api_key)
-    return None
 
 
 def agent_1_predicate_extractor(report_text: str) -> Dict[str, Any]:
@@ -36,10 +17,8 @@ def agent_1_predicate_extractor(report_text: str) -> Dict[str, Any]:
     and proposed 1–5 severity dimension levels.
     """
     t0 = time.perf_counter()
-    client = _get_client()
 
-    if client:
-        prompt = f"""
+    prompt = f"""
 You are Agent 1 (Predicate Extractor) in the AEGIS-HIA framework.
 Extract structured data from this AI incident report and return STRICT JSON ONLY:
 {{
@@ -59,15 +38,18 @@ Extract structured data from this AI incident report and return STRICT JSON ONLY
 }}
 Incident Report: "{report_text}"
 """
-        resp = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-        extracted = json.loads(resp.text or "{}")
-        mode = "LIVE_GEMINI_API"
-    else:
-        # Safe deterministic fallback if GEMINI_API_KEY is not set
+
+    raw_text, mode = generate_with_fallback(prompt, json_mode=True)
+    extracted = None
+
+    if raw_text:
+        try:
+            extracted = json.loads(raw_text)
+        except json.JSONDecodeError:
+            extracted = None
+
+    if not extracted:
+        # Safe deterministic fallback if all LLM models are unavailable
         lower = report_text.lower()
         is_alleged = any(w in lower for w in ["alleged", "claimed", "suspected", "reportedly"])
         is_emp = any(w in lower for w in ["fired", "job", "wage", "worker", "terminated", "hiring", "applicant"])
@@ -93,10 +75,8 @@ def agent_2_impact_analyst(extraction: Dict[str, Any], math_result: Dict[str, An
     it into a concise, traceable institutional summary. NEVER calculates math itself.
     """
     t0 = time.perf_counter()
-    client = _get_client()
 
-    if client:
-        prompt = f"""
+    prompt = f"""
 You are Agent 2 (Impact Analyst) in AEGIS-HIA.
 Write a crisp 3-sentence institutional summary translating these deterministic Python outputs.
 Do NOT recalculate any numbers. State the exact severity score, confirmation status, and remind the reader this is a structured estimate.
@@ -104,15 +84,15 @@ Do NOT recalculate any numbers. State the exact severity score, confirmation sta
 Extraction: {json.dumps(extraction)}
 Deterministic Math Output: {json.dumps(math_result)}
 """
-        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-        summary = (resp.text or "").strip()
-        mode = "LIVE_GEMINI_API"
-    else:
+
+    summary, mode = generate_with_fallback(prompt, json_mode=False)
+
+    if not summary:
         sev = math_result["conditional_severity"]
         eff = math_result["effective_weighted_severity"]
-        cat = extraction["harm_category"]
-        dim = extraction["harm_dimension"]
-        status = extraction["harm_confirmation_status"]
+        cat = extraction.get("harm_category", "UNKNOWN")
+        dim = extraction.get("harm_dimension", "UNKNOWN")
+        status = extraction.get("harm_confirmation_status", "UNKNOWN")
         summary = (
             f"Classified under {cat} ({dim} axis) with confirmation status '{status}'. "
             f"The deterministic Power Mean (q=2) engine computed a conditional individual severity of {sev} "
@@ -169,11 +149,10 @@ def run_single_report_pipeline(report_text: str):
     eval_ms = round((time.perf_counter() - t_eval) * 1000, 2)
     yield {"stage": "AGENT_3", "status": "DONE", "latency_ms": eval_ms, "payload": audit}
 
+
 def agent_2_chat_advisor(user_message: str, context_stats: Dict[str, Any]) -> Dict[str, Any]:
     """AGENT 2 (LLM Chat): Gives interactive policy/safeguard advice grounded in live deterministic stats."""
-    client = _get_client()
-    if client:
-        prompt = f"""
+    prompt = f"""
 You are Agent 2 (AI Policy & Impact Advisor) in the AEGIS-HIA framework.
 Answer the user's question concisely with actionable recommendations based ONLY on these deterministic numbers.
 Never invent new statistics. Remind them these are schema-dependent estimates.
@@ -184,15 +163,16 @@ LIVE DETERMINISTIC CONTEXT:
 USER QUESTION:
 {user_message}
 """
-        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-        return {"reply": (resp.text or "").strip(), "mode": "LIVE_GEMINI_API"}
 
-    # Fallback if GEMINI_API_KEY is not loaded
+    reply, mode = generate_with_fallback(prompt, json_mode=False)
+    if reply:
+        return {"reply": reply, "mode": mode}
+
     return {
         "reply": (
-            "Running in local fallback mode (add GEMINI_API_KEY to backend/.env for live Gemini responses). "
+            "All live LLM endpoints are currently busy—responding from deterministic fallback. "
             "Based on your current stats, enabling a FULL Human Appeal Mechanism reduces normalized Sovereignty burden "
             "by ~94% (residual risk ratio 0.0567) while keeping independent benefit gains nearly unchanged (~28.8%)."
         ),
         "mode": "LOCAL_FALLBACK_MODE",
-    }    
+    }
