@@ -2,7 +2,7 @@
 
 **Team TEMPEST** | Track 1: Agentic AI (*AI in Social Life*) — **AGENTIC X 2.0 (Woxsen University Future Tech Summit '26)**
 
-* **Live Demo (Frontend):** https://aegis-ten-pi.vercel.app/
+* **Live Demo (Frontend):** https://aegis-v1-prototype.vercel.app/
 * **Backend API (FastAPI):** https://aegis-kxs4.onrender.com/docs
 
 > **Important Note for Reviewers & Judges (Cold Start & V1 Prototype Status):**
