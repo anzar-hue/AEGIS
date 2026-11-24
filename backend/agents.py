@@ -19,7 +19,7 @@ from math_engine import (
     CONFIRMATION_WEIGHTS,
 )
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 
 
 def _get_client():
